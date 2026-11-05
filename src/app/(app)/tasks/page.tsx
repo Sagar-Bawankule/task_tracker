@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { listMembers, listTasks } from "@/lib/data";
+import { listMembers, listProjects, listTasks } from "@/lib/data";
 import { CATEGORIES, PRIORITIES, STATUSES, isPriority, isStatus } from "@/lib/constants";
-import { todayStr } from "@/lib/dates";
+import { formatShort, todayStr } from "@/lib/dates";
 import { one } from "@/lib/scope";
 import { DueLabel, Empty, PageHeader, PriorityLabel } from "@/components/ui";
 import { StatusSelect } from "@/components/forms";
@@ -19,22 +19,33 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const status = statusP === "open" || statusP === "all" || isStatus(statusP) ? statusP : "open";
   const priority = isPriority(one(sp.priority)) ? one(sp.priority) : undefined;
   const category = one(sp.category) || undefined;
+  const project = one(sp.project) || undefined;
   const q = (one(sp.q) ?? "").trim().slice(0, 100) || undefined;
   const assigneeParam = Number(one(sp.assignee));
   const assigneeId = isAdmin ? (Number.isInteger(assigneeParam) && assigneeParam > 0 ? assigneeParam : null) : user.id;
 
-  const [tasks, members] = await Promise.all([
-    listTasks({ assigneeId, status: status === "all" ? undefined : status, priority, category, q }),
+  const [tasks, members, projects] = await Promise.all([
+    listTasks({ assigneeId, status: status === "all" ? undefined : status, priority, category, project, q }),
     isAdmin ? listMembers() : Promise.resolve([]),
+    listProjects(),
   ]);
-  const currentUrl = `/tasks?${new URLSearchParams(Object.entries({ status, priority, category, q, assignee: assigneeId && isAdmin ? String(assigneeId) : undefined }).filter(([, v]) => v) as [string, string][]).toString()}`;
+  const dates = tasks.map((t) => t.created_on).sort();
+  const exportFrom = dates[0] ?? today;
+  const exportTo = today;
+  const currentUrl = `/tasks?${new URLSearchParams(Object.entries({ status, priority, category, project, q, assignee: assigneeId && isAdmin ? String(assigneeId) : undefined }).filter(([, v]) => v) as [string, string][]).toString()}`;
 
   return (
     <>
       <PageHeader
         title={isAdmin ? "All tasks" : "My tasks"}
         subtitle={`${tasks.length} task${tasks.length === 1 ? "" : "s"}`}
-        actions={<Link href={`/tasks/new?returnTo=${encodeURIComponent(currentUrl)}`} className="btn-primary">+ New task</Link>}
+        actions={
+          <>
+            <Link href="/tasks/import" className="btn-ghost">Import from Excel</Link>
+            <a href={`/api/export?type=tasks&from=${exportFrom}&to=${exportTo}${isAdmin && assigneeId ? `&user=${assigneeId}` : ""}`} className="btn-ghost">Export Excel</a>
+            <Link href={`/tasks/new?returnTo=${encodeURIComponent(currentUrl)}`} className="btn-primary">+ New task</Link>
+          </>
+        }
       />
 
       <form className="card mb-4 flex flex-wrap items-end gap-3 p-3" method="get">
@@ -66,6 +77,14 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
             {PRIORITIES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
           </select>
         </div>
+        <div className="max-w-56">
+          <label className="label" htmlFor="f-project">Project</label>
+          <select className="input" id="f-project" name="project" defaultValue={project ?? ""}>
+            <option value="">Any</option>
+            {project && !projects.includes(project) && <option value={project}>{project}</option>}
+            {projects.map((p) => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
         <div>
           <label className="label" htmlFor="f-category">Category</label>
           <select className="input" id="f-category" name="category" defaultValue={category ?? ""}>
@@ -82,12 +101,13 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
           <Empty>No tasks match these filters.</Empty>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px]">
+            <table className="w-full min-w-[820px]">
               <thead className="bg-stone-50/70">
                 <tr>
+                  <th className="th">Date</th>
                   <th className="th">Task</th>
                   {isAdmin && <th className="th">Assigned to</th>}
-                  <th className="th">Category</th>
+                  <th className="th">Project / category</th>
                   <th className="th">Priority</th>
                   <th className="th">Due</th>
                   <th className="th">Status</th>
@@ -96,6 +116,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
               <tbody className="divide-y divide-stone-100">
                 {tasks.map((t) => (
                   <tr key={t.id} className="hover:bg-stone-50/60">
+                    <td className="td whitespace-nowrap text-xs text-stone-500">{formatShort(t.created_on)}</td>
                     <td className="td max-w-80">
                       <Link
                         href={`/tasks/${t.id}?returnTo=${encodeURIComponent(currentUrl)}`}
@@ -103,10 +124,15 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
                       >
                         {t.title}
                       </Link>
-                      {t.description && <div className="truncate text-xs text-stone-400">{t.description}</div>}
+                      {(t.status_note || t.description) && (
+                        <div className="truncate text-xs text-stone-400">
+                          {t.status_note && <span className="italic text-stone-500">{t.status_note} · </span>}
+                          {t.description}
+                        </div>
+                      )}
                     </td>
                     {isAdmin && <td className="td text-stone-600">{t.assignee_name ?? <span className="text-stone-400">Unassigned</span>}</td>}
-                    <td className="td text-stone-600">{t.category}</td>
+                    <td className="td max-w-48 truncate text-stone-600" title={t.project || t.category}>{t.project || t.category}</td>
                     <td className="td"><PriorityLabel priority={t.priority} /></td>
                     <td className="td whitespace-nowrap"><DueLabel due={t.due_date} today={today} done={t.status === "done"} /></td>
                     <td className="td"><StatusSelect id={t.id} status={t.status} /></td>

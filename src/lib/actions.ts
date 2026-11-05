@@ -108,21 +108,36 @@ export async function saveTask(fd: FormData) {
   let assigneeId = num(fd, "assignee_id");
   if (user.role !== "admin") assigneeId = assigneeId ?? user.id;
   const today = todayStr();
+  const extra = [
+    str(fd, "project").slice(0, 120),
+    str(fd, "source").slice(0, 60),
+    str(fd, "output"),
+    str(fd, "notes"),
+    str(fd, "link").slice(0, 1000),
+    str(fd, "status_note").slice(0, 200),
+  ];
+  const wd = str(fd, "work_date");
+  const workDate = isDateStr(wd) && wd <= today ? wd : today;
+  const cd = str(fd, "completed_on");
+  const completedInput = isDateStr(cd) && cd <= today ? cd : null;
 
   if (id) {
     if (!(await canEditTask(user, id))) throw new Error("You can't edit this task.");
     await query(
       `UPDATE tasks SET title=$1, description=$2, category=$3, priority=$4, status=$5, assignee_id=$6, due_date=$7,
-         completed_on = CASE WHEN $5 = 'done' THEN COALESCE(completed_on, $8) ELSE NULL END,
+         completed_on = CASE WHEN $5 = 'done' THEN COALESCE($8, completed_on, $9) ELSE NULL END,
+         created_on = $10, project=$11, source=$12, output=$13, notes=$14, link=$15, status_note=$16,
          updated_at = now()
-       WHERE id = $9`,
-      [title, description, category, priority, status, assigneeId, dueDate, today, id],
+       WHERE id = $17`,
+      [title, description, category, priority, status, assigneeId, dueDate, completedInput, today, workDate, ...extra, id],
     );
   } else {
     await query(
-      `INSERT INTO tasks (title, description, category, priority, status, assignee_id, created_by, due_date, created_on, completed_on)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-      [title, description, category, priority, status, assigneeId, user.id, dueDate, today, status === "done" ? today : null],
+      `INSERT INTO tasks (title, description, category, priority, status, assignee_id, created_by, due_date, created_on, completed_on,
+         project, source, output, notes, link, status_note)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+      [title, description, category, priority, status, assigneeId, user.id, dueDate, workDate,
+        status === "done" ? completedInput ?? workDate : null, ...extra],
     );
   }
   revalidatePath("/", "layout");

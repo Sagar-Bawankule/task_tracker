@@ -38,14 +38,15 @@ export default async function Dashboard() {
         actions={
           <>
             <Link href="/tasks/new?returnTo=/" className="btn-primary">+ New task</Link>
-            <Link href="/weekly" className="btn-ghost">This week’s summary</Link>
+            <Link href="/daily" className="btn-ghost">Add today’s tasks</Link>
+            <Link href="/tasks/import" className="btn-ghost">Import Excel</Link>
           </>
         }
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="My hours today" value={hrs(myTodayHours)} hint={myTodayHours === 0 ? "Nothing logged yet" : undefined} tone={myTodayHours === 0 ? "warn" : "default"} />
-        <Stat label={isAdmin ? "Team hours this week" : "My hours this week"} value={hrs(week.hours)} />
+        <Stat label={isAdmin ? "Team tasks this week" : "My tasks this week"} value={week.tasksTouched} hint={week.hours ? `${hrs(week.hours)} logged` : undefined} />
         <Stat label="Tasks done this week" value={week.completed} tone={week.completed ? "good" : "default"} />
         <Stat label="My open / overdue" value={<>{myOpen.length}<span className="text-base text-stone-400"> / </span><span className={myOverdue ? "text-red-600" : ""}>{myOverdue}</span></>} />
       </div>
@@ -56,7 +57,7 @@ export default async function Dashboard() {
             <TaskList tasks={myOpen.slice(0, 12)} today={today} showAssignee={false} empty="No open tasks. Nice work!" />
           </Section>
 
-          <Section title={isAdmin ? "This week · team hours per day" : "This week · my hours per day"} right={<Link href="/weekly" className="text-xs text-brand-700 hover:underline">Full summary →</Link>}>
+          <Section title={isAdmin ? "This week · team tasks per day" : "This week · my tasks per day"} right={<Link href="/weekly" className="text-xs text-brand-700 hover:underline">Full summary →</Link>}>
             <DayColumns
               today={today}
               days={week.days.map((d) => ({ ...d, label: formatDay(d.date), href: `/daily?date=${d.date}` }))}

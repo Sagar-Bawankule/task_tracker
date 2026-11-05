@@ -12,6 +12,7 @@ export function TaskList({
   editable = true,
   empty = "No tasks.",
   showCompleted = false,
+  showProject = true,
 }: {
   tasks: Task[];
   today: string;
@@ -19,6 +20,7 @@ export function TaskList({
   editable?: boolean;
   empty?: string;
   showCompleted?: boolean;
+  showProject?: boolean;
 }) {
   if (!tasks.length) return <Empty>{empty}</Empty>;
   return (
@@ -34,14 +36,25 @@ export function TaskList({
             >
               {t.title}
             </Link>
-            <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs text-stone-500">
-              <PriorityLabel priority={t.priority} />
-              <span>{t.category}</span>
+            {t.description && <p className="mt-0.5 line-clamp-2 text-xs text-stone-500">{t.description}</p>}
+            <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs text-stone-500">
+              {t.priority !== "medium" && <PriorityLabel priority={t.priority} />}
+              {showProject && t.project ? (
+                <span className="rounded bg-stone-100 px-1.5 py-px text-stone-600">{t.project}</span>
+              ) : (
+                !t.project && t.category !== "General" && <span>{t.category}</span>
+              )}
               {showAssignee && <span>{t.assignee_name ?? "Unassigned"}</span>}
+              {t.status_note && <span className="italic text-stone-500">{t.status_note}</span>}
               {showCompleted && t.completed_on ? (
                 <span className="text-emerald-700">Done {formatShort(t.completed_on)}</span>
               ) : (
-                <DueLabel due={t.due_date} today={today} done={t.status === "done"} />
+                t.due_date && <DueLabel due={t.due_date} today={today} done={t.status === "done"} />
+              )}
+              {t.link && (
+                <a href={t.link} target="_blank" rel="noopener noreferrer" className="text-brand-700 hover:underline">
+                  Open link ↗
+                </a>
               )}
             </div>
           </div>

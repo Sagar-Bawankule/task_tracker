@@ -6,3 +6,8 @@ node_modules
 .vercel
 *.tsbuildinfo
 next-env.d.ts
+
+# business data files (import them through the app instead)
+*.xlsx
+*.xls
+*.csv

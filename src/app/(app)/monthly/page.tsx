@@ -30,10 +30,10 @@ export default async function MonthlyPage({ searchParams }: { searchParams: Prom
   const lead = (weekday(from) + 6) % 7;
   const cells: (typeof s.days[number] | null)[] = [...Array(lead).fill(null), ...s.days];
   while (cells.length % 7) cells.push(null);
-  const maxHours = Math.max(1, ...s.days.map((d) => d.hours));
+  const maxTasks = Math.max(1, ...s.days.map((d) => d.tasks));
 
   // Week-by-week breakdown (weeks starting Monday, clipped to the month)
-  const weeks: { start: string; from: string; to: string; hours: number; completed: number; logs: number }[] = [];
+  const weeks: { start: string; from: string; to: string; hours: number; completed: number; logs: number; tasks: number }[] = [];
   for (let ws = weekStart(from); ws <= to; ws = addDays(ws, 7)) {
     const wf = ws < from ? from : ws;
     const we = addDays(ws, 6) > to ? to : addDays(ws, 6);
@@ -45,6 +45,11 @@ export default async function MonthlyPage({ searchParams }: { searchParams: Prom
       hours: ds.reduce((a, d) => a + d.hours, 0),
       completed: ds.reduce((a, d) => a + d.completed, 0),
       logs: ds.reduce((a, d) => a + d.logs, 0),
+      tasks: new Set(
+        s.touchedTasks
+          .filter((t) => (t.created_on >= wf && t.created_on <= we) || (t.completed_on && t.completed_on >= wf && t.completed_on <= we))
+          .map((t) => t.id),
+      ).size,
     });
   }
   const workingDays = s.days.filter((d) => weekday(d.date) !== 0 && d.date <= today).length;
@@ -72,7 +77,7 @@ export default async function MonthlyPage({ searchParams }: { searchParams: Prom
       <SummaryStats s={s} workingDays={Math.max(workingDays, 0)} />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        <Section title="Calendar" className="lg:col-span-2" right={<span className="text-xs text-stone-400">Darker = more hours · ✓ = tasks done</span>}>
+        <Section title="Calendar" className="lg:col-span-2" right={<span className="text-xs text-stone-400">Number = tasks · darker = busier</span>}>
           <div className="p-3 sm:p-4">
             <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
               {WEEKDAYS.map((w) => (
@@ -80,7 +85,7 @@ export default async function MonthlyPage({ searchParams }: { searchParams: Prom
               ))}
               {cells.map((d, i) => {
                 if (!d) return <div key={`b${i}`} />;
-                const intensity = d.hours / maxHours;
+                const intensity = d.tasks / maxTasks;
                 const future = d.date > today;
                 const sunday = weekday(d.date) === 0;
                 return (
@@ -90,13 +95,17 @@ export default async function MonthlyPage({ searchParams }: { searchParams: Prom
                     className={`relative flex aspect-square flex-col rounded-lg border p-1 text-left transition hover:ring-2 hover:ring-brand-300 sm:aspect-auto sm:min-h-20 sm:p-2 ${
                       d.date === today ? "border-brand-500" : "border-stone-200"
                     } ${future ? "bg-stone-50/50" : ""}`}
-                    style={d.hours > 0 ? { backgroundColor: `rgba(217, 68, 120, ${0.08 + intensity * 0.42})` } : undefined}
+                    style={d.tasks > 0 ? { backgroundColor: `rgba(217, 68, 120, ${0.08 + intensity * 0.42})` } : undefined}
                   >
                     <span className={`text-xs ${d.date === today ? "font-bold text-brand-700" : sunday ? "text-stone-400" : "text-stone-600"}`}>
                       {Number(d.date.slice(8))}
                     </span>
-                    {d.hours > 0 && <span className="mt-auto text-[11px] font-semibold tabular-nums text-stone-800 sm:text-sm">{hrs(d.hours)}</span>}
-                    {d.completed > 0 && <span className="text-[10px] text-emerald-800 sm:text-xs">✓ {d.completed}</span>}
+                    {d.tasks > 0 && (
+                      <span className="mt-auto text-[11px] font-semibold tabular-nums text-stone-800 sm:text-sm">
+                        {d.tasks}<span className="hidden font-normal sm:inline"> task{d.tasks === 1 ? "" : "s"}</span>
+                      </span>
+                    )}
+                    {d.hours > 0 && <span className="hidden text-[10px] tabular-nums text-stone-600 sm:inline sm:text-xs">{hrs(d.hours)}</span>}
                   </Link>
                 );
               })}
@@ -114,8 +123,11 @@ export default async function MonthlyPage({ searchParams }: { searchParams: Prom
                     <div className="text-xs text-stone-500">{formatShort(w.from)} – {formatShort(w.to)}</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-semibold tabular-nums text-brand-700">{hrs(w.hours)}</div>
-                    <div className="text-xs text-emerald-700">✓ {w.completed} done</div>
+                    <div className="text-sm font-semibold tabular-nums text-brand-700">{w.tasks} tasks</div>
+                    <div className="text-xs text-stone-500">
+                      <span className="text-emerald-700">✓ {w.completed} done</span>
+                      {w.hours > 0 && <> · {hrs(w.hours)}</>}
+                    </div>
                   </div>
                 </Link>
               </li>
@@ -136,8 +148,8 @@ export default async function MonthlyPage({ searchParams }: { searchParams: Prom
           title={`Tasks completed (${s.completed})`}
           right={
             <div className="no-print flex gap-3">
-              <a href={`/api/export?from=${from}&to=${to}${userQ}`} className="text-xs text-brand-700 hover:underline">Work log CSV</a>
-              <a href={`/api/export?type=tasks&from=${from}&to=${to}${userQ}`} className="text-xs text-brand-700 hover:underline">Tasks CSV</a>
+              <a href={`/api/export?type=tasks&from=${from}&to=${to}${userQ}`} className="text-xs text-brand-700 hover:underline">Tasks Excel</a>
+              {s.logs > 0 && <a href={`/api/export?from=${from}&to=${to}${userQ}`} className="text-xs text-brand-700 hover:underline">Hours CSV</a>}
               <PrintButton />
             </div>
           }

@@ -39,6 +39,15 @@ const SCHEMA = [
     note TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`,
+  // v2: extra task details (project grouping, imported spreadsheet fields)
+  `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS project TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS output TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS link TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS status_note TEXT NOT NULL DEFAULT ''`,
+  `CREATE INDEX IF NOT EXISTS idx_tasks_created ON tasks(created_on)`,
+  `CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project)`,
   `CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks(assignee_id)`,
   `CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(due_date)`,
   `CREATE INDEX IF NOT EXISTS idx_tasks_completed ON tasks(completed_on)`,

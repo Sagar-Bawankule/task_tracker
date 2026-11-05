@@ -157,42 +157,43 @@ export function BarList({
   );
 }
 
-/** Vertical column chart for per-day values */
+/** Vertical column chart: bar = tasks that day; hours shown underneath when logged */
 export function DayColumns({
   days,
   today,
 }: {
-  days: { date: string; label: string; hours: number; completed: number; href: string }[];
+  days: { date: string; label: string; tasks: number; hours: number; completed: number; href: string }[];
   today: string;
 }) {
-  const max = Math.max(1, ...days.map((d) => d.hours));
+  const max = Math.max(1, ...days.map((d) => d.tasks));
+  const anyHours = days.some((d) => d.hours > 0);
   return (
     <div className="p-4">
-      <div className="flex h-44 items-end gap-1.5 sm:gap-2">
+      <div className="flex h-44 items-end gap-1 sm:gap-2">
         {days.map((d) => (
           <Link
             key={d.date}
             href={d.href}
             className="group flex h-full min-w-0 flex-1 flex-col items-center justify-end"
-            title={`${d.date}: ${hrs(d.hours)} logged, ${d.completed} tasks done`}
+            title={`${d.date}: ${d.tasks} tasks, ${d.completed} completed${d.hours ? `, ${hrs(d.hours)} logged` : ""}`}
           >
-            <span className="mb-1 text-[11px] tabular-nums text-stone-500">{d.hours > 0 ? hrs(d.hours) : ""}</span>
+            <span className="mb-1 text-[11px] font-medium tabular-nums text-stone-600">{d.tasks > 0 ? d.tasks : ""}</span>
             <div
               className={`w-full max-w-12 rounded-t-md transition group-hover:opacity-80 ${
                 d.date === today ? "bg-brand-600" : "bg-brand-300"
               }`}
-              style={{ height: `${Math.max(d.hours > 0 ? 4 : 0, (d.hours / max) * 100)}%` }}
+              style={{ height: `${Math.max(d.tasks > 0 ? 4 : 0, (d.tasks / max) * 100)}%` }}
             />
           </Link>
         ))}
       </div>
-      <div className="mt-2 flex gap-1.5 border-t border-stone-100 pt-2 sm:gap-2">
+      <div className="mt-2 flex gap-1 border-t border-stone-100 pt-2 sm:gap-2">
         {days.map((d) => (
           <div key={d.date} className="min-w-0 flex-1 text-center">
             <div className={`truncate text-[11px] ${d.date === today ? "font-semibold text-brand-700" : "text-stone-500"}`}>
               {d.label}
             </div>
-            <div className="text-[11px] text-emerald-700">{d.completed > 0 ? `✓${d.completed}` : " "}</div>
+            {anyHours && <div className="text-[10px] tabular-nums text-stone-400">{d.hours > 0 ? hrs(d.hours) : " "}</div>}
           </div>
         ))}
       </div>
